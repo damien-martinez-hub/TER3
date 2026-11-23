@@ -72,7 +72,8 @@ export interface CallbackResponse {
 export type NotionAction =
   | "search_pages"
   | "list_pages"
-  | "list_databases";
+  | "list_databases"
+  | "create_page";
 
 export interface NotionQueryPayload {
   action: NotionAction;

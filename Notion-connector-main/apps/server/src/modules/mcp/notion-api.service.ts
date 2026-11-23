@@ -35,6 +35,7 @@ export interface NotionDatabase {
   title: Array<{ plain_text: string }>;
   description: Array<{ plain_text: string }>;
   url: string;
+  properties?: Record<string, { type?: string }>;
   parent?: {
     type: string;
     page_id?: string;
@@ -200,6 +201,59 @@ export async function getDatabase(
   }
 
   return response.json() as Promise<NotionDatabase>;
+}
+
+/**
+ * Create a page in a database and store each questionnaire response in its body.
+ */
+export async function createDatabasePage(
+  accessToken: string,
+  databaseId: string,
+  title: string,
+  answers: Array<{ question: string; answer: string }>
+): Promise<{ id: string; url: string }> {
+  const database = await getDatabase(accessToken, databaseId);
+  const titleProperty = Object.entries(database.properties ?? {}).find(
+    ([, property]) => property.type === "title"
+  )?.[0];
+
+  if (!titleProperty) {
+    throw new MCPRequestError("The selected database has no title property");
+  }
+
+  const children = answers.flatMap(({ question, answer }) => [
+    {
+      object: "block",
+      type: "heading_3",
+      heading_3: { rich_text: [{ type: "text", text: { content: question } }] },
+    },
+    {
+      object: "block",
+      type: "paragraph",
+      paragraph: { rich_text: [{ type: "text", text: { content: answer } }] },
+    },
+  ]);
+
+  const response = await notionFetch(accessToken, "/pages", {
+    method: "POST",
+    body: {
+      parent: { database_id: databaseId },
+      properties: {
+        [titleProperty]: {
+          title: [{ type: "text", text: { content: title } }],
+        },
+      },
+      children,
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new MCPRequestError(`Failed to create Notion page: ${response.status} ${errorText}`);
+  }
+
+  const page = await response.json() as { id: string; url: string };
+  return { id: page.id, url: page.url };
 }
 
 /**

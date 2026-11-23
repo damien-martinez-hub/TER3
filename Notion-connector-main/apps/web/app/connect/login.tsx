@@ -29,7 +29,7 @@ export default function Login({ mode = "login" }: LoginProps) {
         password,
         ...(isRegister && name.trim() ? { name: name.trim() } : {}),
       });
-      window.location.assign("/home");
+      window.location.assign("/questions");
     } catch (err) {
       setError(
         err instanceof ApiClientError

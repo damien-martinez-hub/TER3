@@ -16,6 +16,7 @@ import {
   searchNotion,
   getPage,
   getDatabase,
+  createDatabasePage,
   queryDatabase,
   getBotUser,
   listUsers,
@@ -37,7 +38,7 @@ const OPERATION_MAP: Record<string, string> = {
   "list_databases": "search_databases",
   "search_pages": "search_pages",
   "search_databases": "search_databases",
-  
+  "create_page": "create_page",
   // MCP-style tool names → Backend operation names
   "notion_search": "search",
   "notion_get_page": "get_page",
@@ -59,6 +60,7 @@ const OPERATION_MAP: Record<string, string> = {
  * - get_page: Get a specific page
  * - get_database: Get a specific database
  * - query_database: Query a database for pages
+ * - create_page: Create a page in a database
  * - get_user: Get bot user info
  * - list_users: List workspace users
  */
@@ -160,6 +162,28 @@ async function executeOperation(
         filter: params.filter as Record<string, unknown>,
         sorts: params.sorts as Array<{ property: string; direction: "ascending" | "descending" }>,
       }).then(transformSearchResult);
+
+    case "create_page": {
+      const databaseId = params.databaseId;
+      const title = params.title;
+      const answers = params.answers;
+
+      if (typeof databaseId !== "string" || !databaseId.trim()) {
+        throw new MCPRequestError("databaseId is required for create_page operation");
+      }
+      if (typeof title !== "string" || !title.trim() || title.length > 2000) {
+        throw new MCPRequestError("A title of 1 to 2000 characters is required");
+      }
+      if (
+        !Array.isArray(answers) ||
+        answers.length === 0 ||
+        !answers.every(isQuestionAnswer)
+      ) {
+        throw new MCPRequestError("Questionnaire answers are invalid");
+      }
+
+      return createDatabasePage(accessToken, databaseId, title, answers);
+    }
 
     case "get_user":
       return getBotUser(accessToken);
@@ -322,5 +346,21 @@ function isAuthError(err: unknown): boolean {
   return (
     err instanceof Error &&
     ((err as any).status === 401 || err.message.includes("authentication"))
+  );
+}
+
+function isQuestionAnswer(
+  value: unknown
+): value is { question: string; answer: string } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "question" in value &&
+    typeof value.question === "string" &&
+    value.question.length > 0 &&
+    value.question.length <= 2000 &&
+    "answer" in value &&
+    typeof value.answer === "string" &&
+    value.answer.length <= 2000
   );
 }
