@@ -6,6 +6,8 @@ import { apiClient, ApiClientError } from "@/lib/api-client";
 import { useNotionConnection } from "@/hooks/useNotionConnection";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import type { NotionDatabase, NotionQueryResult } from "@/types/notion";
+import MultiSelectExample, { Option } from "./MultiSelect";
+
 
 const QUESTIONS = [
   { id: "name", label: "Quel est votre nom complet ?", type: "text" },
@@ -17,14 +19,87 @@ const QUESTIONS = [
   },
 ] as const;
 
+const options: Option[] = [
+  { value: "Veille AAP", label: "Veille AAP" },
+  { value: "Recherche Partenaires", label: "Recherche Partenaires" },
+  { value: "Ecriture de Dossier", label: "Ecriture de Dossier" },
+  { value: "Formation PE", label: "Formation PE" },
+  { value: "Soutien Administratif", label: "Soutien Administratif" },
+  { value: "Aide au dépot", label: "Aide au dépot" },
+];
+
+
+
 const QUESTIONS2 = [
-  { id: "name", label: "Quel est votre nom complet ?", type: "text" },
-  { id: "email", label: "Quelle est votre adresse e-mail ?", type: "email" },
+  { id: "attentes", label: "Attentes Accompagnement", type: "select", optionS:options},
+  { id: "besoin", label: "Besoin d'accompagnement ?", type: "ouinon"},
   {
-    id: "request",
-    label: "Comment pouvons-nous vous aider XXX?",
+    id: "besoinReel",
+    label: "Besoin Réel d'accompagnement:",
     type: "textarea",
   },
+  {
+    id: "besoinsPrincipaux",
+    label: "Besoins Principaux:",
+    type: "textarea",
+  },
+  {
+    id: "CR EEN",
+    label: "CR EEN",
+    type: "textarea",
+  },
+
+  {
+    id: "Compta Analytique",
+    label: "Compta Analytique:",
+    type: "ouinon",
+
+  },
+  {
+    id: "Conseiller EEN LaRi",
+    label: "Conseiller EEN LaRi:",
+    type: "textarea",
+  }
+  ,
+  {
+    id: "Contact PE",
+    label: "Contact PE",
+    type: "textarea",
+  }
+  ,
+
+  {
+    id: "Culture Projets Collaboratifs",
+    label: "Culture Projets Collaboratifs ? ",
+    type: "ouinon",
+  }
+  ,
+  {
+    id: "EU comme levier stratégique",
+    label: "EU comme levier stratégique ? ",
+    type: "ouinon",
+  },
+  {
+    id: "email",
+    label: "email:",
+    type: "textarea",
+  },
+  {
+    id: "Fonds propres disponibles",
+    label: "Fonds propres disponibles ? ",
+    type: "ouinon",
+  },
+  {
+    id: "Freedom to Operate",
+    label: "Freedom to Operate ? (entrez 'oui' ou 'non' ou 'pas sûr') ",
+    type: "textarea",
+  }
+  ,
+  {
+    id: "Intérêt Diag Inno",
+    label: "Intérêt Diag Inno ?",
+    type: "ouinon",
+  }
 ] as const;
 
 export function QuestionnaireForm({ company }: { company: string }) {
@@ -38,6 +113,8 @@ export function QuestionnaireForm({ company }: { company: string }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedPageUrl, setSavedPageUrl] = useState<string | null>(null);
+
+  const [selectedValues, setSelectedValues] = useState<string[]>([]);
 
   useEffect(() => {
     if (state !== "connected") return;
@@ -82,13 +159,14 @@ export function QuestionnaireForm({ company }: { company: string }) {
     setSubmitting(true);
 
     try {
+      const respondentName = answers.name?.trim();
       const result = await apiClient.post<{ id: string; url: string }>(
         "/notion/query",
         {
           action: "create_page",
           params: {
             databaseId,
-            title: `${company} — ${answers.name.trim()}`,
+            title: respondentName ? `${company} — ${respondentName}` : company,
             answers: [
               { question: "Entreprise", answer: company },
               ...activeQuestions.map((question) => ({
@@ -101,6 +179,7 @@ export function QuestionnaireForm({ company }: { company: string }) {
       );
       setSavedPageUrl(result.url);
       setAnswers({});
+      setSelectedValues([]);
     } catch (err) {
       setError(
         err instanceof ApiClientError
@@ -201,6 +280,8 @@ export function QuestionnaireForm({ company }: { company: string }) {
               >
                 {question.label}
               </label>
+
+             
               {question.type === "textarea" ? (
                 <textarea
                   id={question.id}
@@ -215,6 +296,42 @@ export function QuestionnaireForm({ company }: { company: string }) {
                   placeholder="Écrivez votre réponse…"
                 />
               ) : (
+                question.type === "select" ? 
+                (
+                    <MultiSelectExample
+                      options={question.optionS}
+                      selectedValues={selectedValues}
+                      onChange={(values) => {
+                        setSelectedValues(values);
+                        updateAnswer(question.id, values.join(", "));
+                      }}
+                    />
+                   
+                )
+                :
+
+                (
+
+                  question.type === "ouinon" ?
+                  (
+                      <select
+                        id={question.id}
+                        required
+                        value={answers[question.id] ?? ""}
+                        onChange={(event) =>
+                          updateAnswer(question.id, event.target.value)
+                        }
+                        className="w-full rounded-xl border border-neutral-800 bg-neutral-900 px-4 py-3 text-sm text-white outline-none focus:border-neutral-500"
+                      >
+                        <option value="" disabled>
+                          Choisissez oui ou non
+                        </option>
+                        <option value="oui">Oui</option>
+                        <option value="non">Non</option>
+                      </select>
+
+
+                  ) : 
                 <input
                   id={question.id}
                   type={question.type}
@@ -231,7 +348,11 @@ export function QuestionnaireForm({ company }: { company: string }) {
                       : "Votre nom"
                   }
                 />
+              )
+              
               )}
+
+          
             </div>
           ))}
 
